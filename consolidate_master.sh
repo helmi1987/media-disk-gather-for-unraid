@@ -220,10 +220,11 @@ process_item_group() {
 
         while read -r p; do
             [[ -z "$p" ]] && continue
-            local d_root=$(get_disk_root "$p")
             
-            # Addiere Größe zum Tally dieser Disk
-            # (Syntax: ${var:-0} setzt 0 wenn leer)
+            # CHANGE: Nur Pfade zählen, die auf /mnt/disk... liegen
+            if [[ "$p" != "/mnt/disk"* ]]; then continue; fi
+
+            local d_root=$(get_disk_root "$p")
             local current_sum=${disk_tally["$d_root"]:-0}
             disk_tally["$d_root"]=$((current_sum + size))
         done <<< "$phys_paths_str"

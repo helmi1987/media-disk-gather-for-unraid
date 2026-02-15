@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Unraid Media Consolidator & Cleaner (V10.2)</title>
+<style>
+  body { font-family: sans-serif; line-height: 1.6; max-width: 800px; margin: 20px auto; color: #333; }
+  pre { background: #f4f4f4; padding: 10px; border-radius: 5px; overflow-x: auto; border: 1px solid #ddd; }
+  code { font-family: monospace; background: #efefef; padding: 2px 4px; border-radius: 3px; }
+  h1, h2, h3 { color: #2c3e50; }
+  hr { border: 0; border-top: 1px solid #ccc; margin: 20px 0; }
+  li { margin-bottom: 5px; }
+  .warning { color: #d35400; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>Unraid Media Consolidator & Cleaner (V10.2)</h1>
+
+<p>Ein hochentwickeltes Bash-Script-Set für Unraid-Systeme. Es dient dazu, zersplitterte Medienbibliotheken (Filme, Serien) zu konsolidieren, zusammengehörige Dateien ("Sidecars" wie NFOs, Bilder) auf derselben Disk zusammenzuführen und verwaiste leere Ordnerstrukturen tiefenrein zu entfernen.</p>
+
+<hr>
+
+<h2>Features (V10.2)</h2>
+
+<h3>Smart Weight Logic (Intelligente Gewichtung)</h3>
+<p>Das Script analysiert, auf welcher <strong>Array-Disk</strong> (<code>/mnt/disk*</code>) bereits die grösste Datenmenge (in Bytes) eines Films oder einer Serie liegt.</p>
+<ul>
+    <li><strong>Neu in V10.2:</strong> Der Cache wird bei der Ziel-Ermittlung ignoriert. Das verhindert, dass der Cache als "Ziel" gewinnt, nur weil dort gerade viele neue Dateien liegen. Der Datenfluss geht immer Richtung Array.</li>
+</ul>
+
+<h3>Cache Handling (Mover-Trennung)</h3>
+<ul>
+    <li><strong>Standard:</strong> Dateien auf dem Cache werden ignoriert und nicht verschoben. Das Script überlässt diese Aufgabe dem nativen Unraid Mover.</li>
+    <li><strong>Optional:</strong> Mit dem Parameter <code>--include-cache</code> kann erzwungen werden, dass auch Dateien vom Cache auf das Array verschoben werden.</li>
+    <li><strong>Duplikate:</strong> Wenn eine Datei sicher auf dem Array liegt und <em>zusätzlich</em> auf dem Cache existiert (Duplikat), wird die Cache-Kopie gelöscht, um Platz zu sparen (unabhängig vom Mover-Setting).</li>
+</ul>
+
+<h3>Deep Clean (Rekursive Tiefenreinigung)</h3>
+<p>Nach der Verschiebung startet Phase 3:</p>
+<ul>
+    <li>Loop-Reinigung: Das Script durchsucht die Disks in Schleifen nach leeren Ordnern, bis alles sauber ist.</li>
+    <li>Root-Protection: Kritische Basis-Ordner (z.B. <code>/mnt/disk1/Filme</code>) werden <strong>niemals</strong> gelöscht.</li>
+</ul>
+
+<hr>
+
+<h2>Voraussetzungen</h2>
+<ul>
+    <li>OS: Unraid (getestet auf Version 6.x / 7.x)</li>
+    <li>Zugriff: Terminal (SSH) oder das "User Scripts" Plugin.</li>
+    <li>Tools: <code>rsync</code> und <code>find</code> (Standardmässig in Unraid enthalten).</li>
+</ul>
+
+<hr>
+
+<h2>Installation</h2>
+
+<h3>1. Verzeichnis erstellen</h3>
+<p>Erstelle einen Ordner auf deinem Cache oder USB-Stick, damit die Scripte Reboot-sicher sind.</p>
+<pre><code>mkdir -p /mnt/user/system/scripts/consolidate/
+cd /mnt/user/system/scripts/consolidate/</code></pre>
+
+<h3>2. Dateien platzieren</h3>
+<p>Kopiere deine beiden Script-Dateien in diesen Ordner:</p>
+<ul>
+    <li><code>consolidate_master.sh</code></li>
+    <li><code>setup_consolidate.sh</code></li>
+</ul>
+
+<h3>3. Berechtigungen setzen</h3>
+<p>Mache die Scripte ausführbar:</p>
+<pre><code>chmod +x consolidate_master.sh setup_consolidate.sh</code></pre>
+
+<hr>
+
+<h2>Konfiguration</h2>
+
+<p>Du musst keine Textdateien manuell bearbeiten. Nutze den integrierten Assistenten, um die Datei <code>consolidate.ini</code> zu erstellen.</p>
+
+<p>Setup starten:</p>
+<pre><code>./setup_consolidate.sh</code></pre>
+
+<p>Der Assistent führt dich durch folgende Schritte:</p>
+<ol>
+    <li>Quellverzeichnisse: Welche User-Shares sollen aufgeräumt werden?</li>
+    <li>Logdatei: Wo soll das Protokoll gespeichert werden?</li>
+    <li>Array-Disks: Wo sollen die Daten dauerhaft liegen? (Standard: <code>/mnt/disk*</code>)</li>
+    <li>Cache/Pools: Wo liegen temporäre oder neue Daten? (z.B. <code>/mnt/cache</code>)</li>
+    <li>Exclude-Datei: Pfad zu einer Datei mit Ausschlusskriterien (optional).</li>
+    <li>Mindestspeicherplatz: Wieviel Platz muss auf einer Disk frei bleiben? (Standard: 256 GB)</li>
+</ol>
+
+<hr>
+
+<h2>Nutzung</h2>
+
+<h3>1. Test-Lauf (Dryrun)</h3>
+<p>Führe das Script ohne Argumente aus. Dies ist der Standardmodus. Es werden keine Dateien bewegt oder gelöscht.</p>
+<pre><code>./consolidate_master.sh</code></pre>
+
+<h3>2. Ernstfall (Live Mode)</h3>
+<p>Nur Array aufräumen (Standard):</p>
+<pre><code>./consolidate_master.sh --run</code></pre>
+
+<p>Array aufräumen UND Cache leeren (alles zum Array schieben):</p>
+<pre><code>./consolidate_master.sh --run --include-cache</code></pre>
+
+<hr>
+
+<h2>Fehlerbehebung</h2>
+
+<p><strong>Fehler: "Keine Ordner auf den Disks gefunden!"</strong><br>
+Prüfe in der Config, ob die Pfade korrekt geschrieben sind (Gross-/Kleinschreibung beachten).</p>
+
+<p><strong>Fehler: "FULL ... Zu wenig Platz"</strong><br>
+Die Ziel-Disk hat weniger freien Speicher als in MIN_FREE_GB definiert. Das Script überspringt diese Datei und versucht es am Ende des Laufs erneut (Retry-Queue).</p>
+
+<hr>
+
+<h2>Haftungsausschluss</h2>
+
+<p>Dieses Script manipuliert Dateien (Verschieben/Löschen) auf Systemebene. Obwohl umfangreiche Sicherheitsmechanismen (Dryrun, Space-Check, Root-Protection) eingebaut sind:</p>
+
+<p class="warning">Die Nutzung erfolgt auf eigene Gefahr. Stelle sicher, dass du regelmässige Backups deiner wichtigen Daten hast!</p>
+
+</body>
+</html>

@@ -13,6 +13,7 @@ CACHE_PATTERN="/mnt/cache"
 DRYRUN=true
 INDEX_FILE="/tmp/consolidate_file_index.txt"
 MIN_FREE_GB=256
+MOVE_CACHE=false  # Standard: Cache nicht anfassen (macht der Mover)
 
 # -----------------------
 # 📥 CONFIG LADEN
@@ -25,7 +26,11 @@ if [[ -f "$CONFIG_FILE" ]]; then
     echo "ℹ️  Config geladen."
 fi
 
-for arg in "$@"; do [[ "$arg" == "--run" ]] && DRYRUN=false; done
+# Argumente parsen
+for arg in "$@"; do 
+    [[ "$arg" == "--run" ]] && DRYRUN=false
+    [[ "$arg" == "--include-cache" ]] && MOVE_CACHE=true
+done
 
 # -----------------------
 # ⚙️ INITIALISIERUNG
@@ -34,6 +39,7 @@ SUMMARY_MOVED=()
 SUMMARY_DUPLICATES=()
 SUMMARY_IGNORED=()
 SUMMARY_SKIPPED_FULL=()
+SUMMARY_SKIPPED_CACHE=() # Neu für Statistik
 SUMMARY_FAILED_FULL=()
 SUMMARY_DELETED_DIRS=()
 
@@ -205,11 +211,8 @@ process_item_group() {
     [[ ${#folder_files[@]} -eq 0 ]] && return
 
     # ---------------------------------------------------------
-    # A. ZIELDISK BESTIMMEN (NEU V10: NACH GESAMT-BELEGUNG)
+    # A. ZIELDISK BESTIMMEN (NUR ARRAY ZÄHLEN)
     # ---------------------------------------------------------
-    # Wir summieren die Dateigrößen pro Disk auf.
-    # Die Disk, die bereits die meisten Daten dieses Films/Serie hat, gewinnt.
-    
     local -A disk_tally
     local target_disk=""
     
@@ -221,8 +224,9 @@ process_item_group() {
         while read -r p; do
             [[ -z "$p" ]] && continue
             
-            # CHANGE: Nur Pfade zählen, die auf /mnt/disk... liegen
+            # --- Array Only Logic ---
             if [[ "$p" != "/mnt/disk"* ]]; then continue; fi
+            # ------------------------
 
             local d_root=$(get_disk_root "$p")
             local current_sum=${disk_tally["$d_root"]:-0}
@@ -230,7 +234,7 @@ process_item_group() {
         done <<< "$phys_paths_str"
     done
 
-    # Gewinner ermitteln (Disk mit meisten Bytes)
+    # Gewinner ermitteln
     local max_bytes=0
     for d in "${!disk_tally[@]}"; do
         local total=${disk_tally["$d"]}
@@ -240,6 +244,7 @@ process_item_group() {
         fi
     done
 
+    # Wenn alles nur auf Cache liegt (kein Array Ziel), brechen wir ab.
     [[ -z "$target_disk" ]] && return
     # ---------------------------------------------------------
 
@@ -270,9 +275,16 @@ process_item_group() {
         done
 
         if $is_on_target; then
+            # Datei ist schon am Ziel. Prüfen auf Duplikate woanders.
             if [[ ${#phys_paths[@]} -gt 1 ]]; then
                 for p in "${phys_paths[@]}"; do
                     if [[ "$p" != "$target_path" ]]; then
+                        
+                        # --- CLEANUP LOGIC ---
+                        # Duplikate löschen wir IMMER, auch auf Cache.
+                        # Das ist kein "Move", sondern Müllentsorgung.
+                        # ---------------------
+                        
                         SUMMARY_DUPLICATES+=("$p")
                         echo -ne "\r\033[K" 
                         local p_disk=$(get_disk_root "$p")
@@ -286,8 +298,20 @@ process_item_group() {
                 done
             fi
         else
+            # Datei ist NICHT am Ziel. Move Action.
             [[ ${#phys_paths[@]} -eq 0 ]] && continue
             local src="${phys_paths[0]}"
+            
+            # ---------------------------------------------------------
+            # NEU V10.2: Cache Protection
+            # Wenn Quelle NICHT Array ist (also Cache/Pool) UND flag nicht gesetzt -> Skip
+            # ---------------------------------------------------------
+            if [[ "$src" != "/mnt/disk"* ]] && [[ "$MOVE_CACHE" == "false" ]]; then
+                SUMMARY_SKIPPED_CACHE+=("$src")
+                continue
+            fi
+            # ---------------------------------------------------------
+
             echo -ne "\r\033[K"
             execute_move "$src" "$target_disk" "$rel_path" false
         fi
@@ -302,7 +326,6 @@ run_deep_clean() {
     echo "🧹 PHASE 3: Deep Clean (Protected)"
     echo "========================================"
     echo "Suche auf physischen Disks nach verwaisten Ordnern..."
-    echo "INFO: Stamm-Verzeichnisse werden NICHT gelöscht."
 
     local all_roots=()
     while read -r p; do [[ -n "$p" ]] && all_roots+=("$p"); done < <(resolve_paths "$ARRAY_PATTERN")
@@ -325,7 +348,6 @@ run_deep_clean() {
                 local target_path="${root}${rel_path}"
 
                 if [[ -d "$target_path" ]]; then
-                    # SAFETY: -mindepth 1 schützt den Share-Root
                     while read -r empty_dir; do
                         SUMMARY_DELETED_DIRS+=("$empty_dir")
                         ((deleted_in_this_pass++))
@@ -357,6 +379,12 @@ if $DRYRUN; then
 else
     echo "⚠️ SCHARFER MODUS"
     sleep 2
+fi
+
+if $MOVE_CACHE; then
+    echo "ℹ️  Cache-Move: AKTIV (Dateien werden vom Cache geholt)"
+else
+    echo "ℹ️  Cache-Move: INAKTIV (Cache wird ignoriert)"
 fi
 
 load_exclusions
@@ -402,10 +430,11 @@ echo ""
 echo "========================================"
 echo "📊 ZUSAMMENFASSUNG"
 echo "----------------------------------------"
-echo "Ignoriert:          ${#SUMMARY_IGNORED[@]}"
-echo "Duplikate gelöscht: ${#SUMMARY_DUPLICATES[@]}"
-echo "Verschoben:         ${#SUMMARY_MOVED[@]}"
-echo "Leere Ordner (del): ${#SUMMARY_DELETED_DIRS[@]}"
+echo "Ignoriert (Exclude): ${#SUMMARY_IGNORED[@]}"
+echo "Duplikate gelöscht:  ${#SUMMARY_DUPLICATES[@]}"
+echo "Verschoben:          ${#SUMMARY_MOVED[@]}"
+echo "Cache ignoriert:     ${#SUMMARY_SKIPPED_CACHE[@]}"
+echo "Leere Ordner (del):  ${#SUMMARY_DELETED_DIRS[@]}"
 echo "----------------------------------------"
 if [[ ${#SUMMARY_FAILED_FULL[@]} -gt 0 ]]; then
     echo "❌ FEHLGESCHLAGEN:   ${#SUMMARY_FAILED_FULL[@]}"

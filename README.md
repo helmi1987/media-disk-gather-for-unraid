@@ -154,3 +154,17 @@ Warte, bis der Mover fertig ist, und starte das Script erneut.
 Dieses Script manipuliert Dateien (Verschieben/Löschen) auf Systemebene. Obwohl umfangreiche Sicherheitsmechanismen (Dryrun, Space-Check, Duplikat-Prüfung, Root-Protection, Mover-Check) eingebaut sind:
 
 Die Nutzung erfolgt auf eigene Gefahr. Stelle sicher, dass du regelmässige Backups deiner wichtigen Daten hast!
+
+## Lizenz
+
+Copyright (C) 2026 helmi1987
+
+Dieses Programm ist freie Software: Du kannst es unter den Bedingungen der
+GNU General Public License, Version 3, wie von der Free Software Foundation
+veröffentlicht, weitergeben und/oder verändern.
+
+Es wird in der Hoffnung verbreitet, dass es nützlich ist, aber **ohne jede
+Garantie** – sogar ohne die implizite Garantie der Marktreife oder der Eignung
+für einen bestimmten Zweck. Details stehen in der Datei [LICENSE](LICENSE)
+(GNU GPL v3, SPDX: `GPL-3.0-or-later`).
+

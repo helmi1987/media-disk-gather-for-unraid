@@ -264,13 +264,6 @@ Ohne `--include-cache` werden Dateien, die nur auf dem Cache liegen, absichtlich
 
 - - -
 
-## Weitere Dateien
-
-*   `TESTBERICHT.md`: Befunde und Testergebnisse von V10.2 zu V11.0.
-*   `media-disk-gather-v11.0.zip`: Release-Paket V11.0 inkl. Testsuite (`test-suite/`) und Patch `v10.2-to-v11.0.patch`.
-
-- - -
-
 ## Haftungsausschluss
 
 Dieses Script manipuliert Dateien (Verschieben/Löschen) auf Systemebene. Obwohl umfangreiche Sicherheitsmechanismen (Dryrun, Space-Check, Duplikat-Prüfung, Root-Protection, Mover-Check) eingebaut sind:

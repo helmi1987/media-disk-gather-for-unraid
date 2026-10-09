@@ -38,7 +38,7 @@ Liegt eine Datei auf der Ziel-Disk und zusätzlich auf einer anderen Disk oder a
 
 Nach der Verschiebung startet Phase 3:
 
-*   Loop-Reinigung: Das Script durchsucht die Disks in Schleifen nach leeren Ordnern, bis alles sauber ist. Nicht löschbare Ordner (z.B. Mountpoints, schreibgeschützte Disks) werden gemeldet und übersprungen – kein Endlos-Loop.
+*   Loop-Reinigung: Das Script durchsucht die Array- und Cache-Disks (nur innerhalb der `BASE_DIRS`) in Schleifen nach leeren Ordnern, bis alles sauber ist. Nicht löschbare Ordner (z.B. Mountpoints, schreibgeschützte Disks) werden gemeldet und übersprungen – kein Endlos-Loop.
 *   Root-Protection: Die Share-Wurzeln auf den Disks (z.B. `/mnt/disk1/Filme`) werden **niemals** gelöscht.
 *   Im Dryrun wird das Ergebnis simuliert: auch Ordner, die erst durch die geplanten Verschiebungen leer würden, werden angezeigt.
 
@@ -63,7 +63,7 @@ Nach der Verschiebung startet Phase 3:
 
 ### 1\. Verzeichnis erstellen
 
-Erstelle einen Ordner auf deinem Cache oder USB-Stick, damit die Scripte Reboot-sicher sind.
+Erstelle einen Ordner auf einem Share (z.B. `system`), damit die Scripte Reboot-sicher sind.
 
 ```
 mkdir -p /mnt/user/system/scripts/consolidate/
@@ -93,10 +93,12 @@ Nutze den Assistenten, um die Datei `consolidate.ini` zu erstellen. Sie wird imm
 ./setup_consolidate.sh
 ```
 
+Existiert bereits eine `consolidate.ini`, werden deren Werte als Vorgabe angeboten. Ungültige Eingaben werden abgewiesen und neu abgefragt.
+
 Der Assistent führt dich durch folgende Schritte:
 
 1.  Quellverzeichnisse: Welche User-Shares sollen aufgeräumt werden? Mehrere mit `;` trennen (Leerzeichen in Pfaden sind erlaubt).
-2.  Logdatei: Wo soll das Protokoll gespeichert werden? (Ordner wird beim scharfen Lauf angelegt)
+2.  Logdatei: Wo soll das Protokoll gespeichert werden? (Standard: `/mnt/user/PlexMedia/consolidate.log`, Ordner wird beim scharfen Lauf angelegt)
 3.  Array-Disks: Wo sollen die Daten dauerhaft liegen? (Standard: `/mnt/disk[0-9]*`)
 4.  Cache/Pools: Wo liegen temporäre oder neue Daten? (z.B. `/mnt/cache /mnt/nvme`)
 5.  Exclude-Datei: Pfad zu einer Datei mit Ausnahmen (optional). Eine Datei **oder ein Ordner** pro Zeile, als `/mnt/user/...`- oder `/mnt/diskN/...`-Pfad.
@@ -166,6 +168,8 @@ Führe das Script ohne Argumente aus. Dies ist der Standardmodus. Es werden kein
 
 ### 2\. Ernstfall (Live Mode)
 
+Der scharfe Lauf startet nach 2 Sekunden Wartezeit (Abbruch mit Ctrl-C möglich).
+
 Nur Array aufräumen (Standard):
 
 ```
@@ -212,7 +216,7 @@ Unbekannte Argumente führen zum Abbruch.
 | Fehler (rsync/rm/mkdir) | Fehlgeschlagene Dateioperationen |
 | Leere Ordner nicht löschbar | z.B. Mountpoints, schreibgeschützte Disks |
 
-Im Dryrun sind alle Werte geplant, nicht ausgeführt.
+Die Zeilen ab "Konflikte" erscheinen nur, wenn ihr Wert grösser als 0 ist. Im Dryrun sind alle Werte geplant, nicht ausgeführt.
 
 Exit-Codes: `0` ok, `1` Konfig-/Startfehler, `2` Lauf mit Fehlern oder Konflikten, `130` Abbruch per Ctrl-C/Signal.
 
